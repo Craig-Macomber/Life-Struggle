@@ -1,15 +1,31 @@
 use std::collections::BTreeMap;
 extern crate num_integer;
+extern crate rayon;
 use num_integer::Integer;
+use rayon::prelude::*;
 
 fn main() {
     println!("Life Struggle");
     let mut a = Tile::new(20);
-    a.set(1, 0, true);
-    a.set(2, 1, true);
-    a.set(0, 2, true);
-    a.set(1, 2, true);
-    a.set(2, 2, true);
+    //a.set(1, 0, true);
+    //a.set(2, 1, true);
+    //a.set(0, 2, true);
+    //a.set(1, 2, true);
+    //a.set(2, 2, true);
+    {
+        let mut q = |x: usize, y: usize| a.set(x, y, true);
+
+        q(0, 0);
+        q(0, 2);
+        q(1, 3);
+        q(2, 3);
+        q(3, 3);
+        q(4, 3);
+        q(4, 2);
+        q(4, 2);
+        q(4, 1);
+        q(3, 0);
+    }
 
     let mut b = Tile::new(20);
     //b.set(0, 2, true);
@@ -28,11 +44,14 @@ fn main() {
     b.set(9, 12, true);
     b.set(8, 12, true);
 
+    b = b.mirror();
+
     struggle(&a, &b);
 }
 
-fn struggle(a: &Tile, b: &Tile) {
-    let mut b = Board::new(a, b);
+fn struggle(tile_a: &Tile, tile_b: &Tile) {
+    let tile_b_mirror = tile_b.mirror();
+    let mut b = Board::new(tile_a, &tile_b_mirror);
     println!(
         "Cycle lengths: {}, {}",
         b.cycle_a.tiles.len(),
@@ -42,10 +61,11 @@ fn struggle(a: &Tile, b: &Tile) {
 
     b.print();
 
-    for _ in 0..1500 {
+    for _ in 0..10000 {
         b.next_generation();
     }
 
+    b.print();
     let (score_a, score_b) = b.score();
     println!("Score: {} to {}!", score_a, score_b);
 }
@@ -82,12 +102,11 @@ impl Board {
     fn next_generation(&mut self) {
         let mut tiles_new = BTreeMap::new();
 
-        let first = *self.tiles.keys().next().unwrap_or(&-1isize);
-        let last = *self.tiles.keys().next_back().unwrap_or(&0isize);
+        let first = self.first_or(-1) - 1;
+        let last = self.last_or(0) + 1;
 
-        for x in first - 1..last + 2 {
+        for x in (first..last + 1) {
             let t = self.tile_at(x);
-
             let tnew = t.next_generation(self.tile_at(x - 1), self.tile_at(x + 1));
 
             if &tnew != self.default_tile_at_gen(x, self.generation + 1) {
@@ -98,9 +117,8 @@ impl Board {
         self.tiles = tiles_new;
         self.generation += 1;
 
-        if self.generation % 50 == 0 {
+        if self.generation % 200 == 0 {
             println!("generation: {}", self.generation);
-            self.print();
         }
     }
 
@@ -124,12 +142,20 @@ impl Board {
         return (score_a, score_b);
     }
 
+    fn first_or(&self, x: isize) -> isize {
+        *self.tiles.keys().next().unwrap_or(&x)
+    }
+
+    fn last_or(&self, x: isize) -> isize {
+        *self.tiles.keys().next_back().unwrap_or(&x)
+    }
+
     fn print(&self) {
-        let first = *self.tiles.keys().next().unwrap_or(&-1isize);
-        let last = *self.tiles.keys().next_back().unwrap_or(&0isize);
+        let first = self.first_or(-1);
+        let last = self.last_or(0);
 
         for x in first..last + 1 {
-            print!("|{number:width$}|", number = x, width = self.tile_size - 2);
+            print!("|{x:^width$}|", x = x, width = self.tile_size - 2);
         }
         println!();
         for y in 0..self.tile_size {
@@ -177,6 +203,7 @@ impl TileCycle {
 
             if tc.tiles.len() > 2 {
                 // Check illegal start tiles that converge to a cycle that does not include the start state
+                // Floyd’s Cycle detection algorithm
                 let a = tc.tiles.len() / 2;
                 let b = tc.tiles.len() - 1;
                 assert!(tc.tiles[a] != tc.tiles[b], "a = {}, b = {}", a, b);
@@ -202,6 +229,20 @@ impl Tile {
             size: size,
             cells: vec![false; size * size],
         }
+    }
+
+    fn mirror(&self) -> Tile {
+        let mut t = Tile {
+            size: self.size,
+            cells: vec![false; self.size * self.size],
+        };
+
+        for x in 0..self.size {
+            for y in 0..self.size {
+                t.set(x, y, self.get(self.size - x - 1, y));
+            }
+        }
+        return t;
     }
 
     fn next_generation(&self, previous: &Tile, next: &Tile) -> Tile {

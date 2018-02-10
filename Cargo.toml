@@ -5,3 +5,4 @@ authors = ["Craig Macomber <CraigM@CraigM.info>"]
 
 [dependencies]
 num-integer = "0.1"
+rayon = "0.9"
