@@ -1,8 +1,12 @@
 use std::collections::BTreeMap;
 extern crate num_integer;
 extern crate rayon;
+extern crate fixedbitset;
 use num_integer::Integer;
 use rayon::prelude::*;
+extern crate time;
+use time::{Duration, PreciseTime};
+use fixedbitset::FixedBitSet;
 
 fn main() {
     println!("Life Struggle");
@@ -46,12 +50,16 @@ fn main() {
 
     b = b.mirror();
 
-    struggle(&a, &b);
+    let start = PreciseTime::now();
+    struggle::<BitTile>(&a, &b);
+    println!("Time in MS: {}", start.to(PreciseTime::now()).num_milliseconds())
 }
 
-fn struggle(tile_a: &Tile, tile_b: &Tile) {
+fn struggle<T>(tile_a: &Tile, tile_b: &Tile) where T: LifeTile{
     let tile_b_mirror = tile_b.mirror();
-    let mut b = Board::new(tile_a, &tile_b_mirror);
+    let bit_tile_a = T::copy_from(tile_a);
+    let bit_tile_b = T::copy_from(&tile_b_mirror);
+    let mut b = Board::new(&bit_tile_a, &bit_tile_b);
     println!(
         "Cycle lengths: {}, {}",
         b.cycle_a.tiles.len(),
@@ -70,28 +78,117 @@ fn struggle(tile_a: &Tile, tile_b: &Tile) {
     println!("Score: {} to {}!", score_a, score_b);
 }
 
+trait LifeTile where Self: std::marker::Sized + Clone + Eq{
+    fn new(size: usize) -> Self; 
+    fn size(&self) -> usize;
+    fn get(&self, x: usize, y: usize) -> bool;
+    fn set(&mut self, x: usize, y: usize, value: bool);
+
+    fn copy_from<T>(t_in: &T) -> Self where T: LifeTile{
+        let size = t_in.size();
+        let mut t = Self::new(size);
+
+        for x in 0..size {
+            for y in 0..size {
+                t.set(x, y, t_in.get(x, y));
+            }
+        }
+        return t;
+    }
+
+    fn mirror(&self) -> Self {
+        let size = self.size();
+        let mut t = Self::new(size);
+
+        for x in 0..size {
+            for y in 0..size {
+                t.set(x, y, self.get(size - x - 1, y));
+            }
+        }
+        return t;
+    }
+
+    fn next_generation(&self, previous: &Self, next: &Self) -> Self {
+        let size = self.size();
+
+        let at = |x: isize, y: isize| {
+            let y2 = y.mod_floor(&(size as isize));
+            let x2 = x.mod_floor(&(size as isize));
+            let t = if x < 0 {
+                &previous
+            } else if x >= size as isize {
+                &next
+            } else {
+                &self
+            };
+
+            return t.get(x2 as usize, y2 as usize);
+        };
+
+        let mut t = Self::new(size);
+
+        for x in 0..size {
+            for y in 0..size {
+                let mut c = 0;
+
+                for xx in -1isize..2 {
+                    for yy in -1isize..2 {
+                        if at(xx + x as isize, yy + y as isize) {
+                            c += 1;
+                        }
+                    }
+                }
+
+                let v = if self.get(x, y) {
+                    c == 3 || c == 4
+                } else {
+                    c == 3
+                };
+
+                t.set(x, y, v);
+            }
+        }
+        return t;
+    }
+
+    fn print_line(&self, y: usize) {
+        for x in 0..self.size() {
+            let s = if self.get(x, y) { "X" } else { "." };
+            print!("{}", s);
+        }
+    }
+
+    fn print(&self) {
+        for y in 0..self.size() {
+            self.print_line(y);
+            println!();
+        }
+    }
+}
+
+
 #[derive(Debug)]
-struct Board {
+struct Board<T> where T: LifeTile{
     tile_size: usize,
-    tiles: BTreeMap<isize, Tile>,
+    tiles: BTreeMap<isize, T>,
     generation: usize,
-    cycle_a: TileCycle,
-    cycle_b: TileCycle,
+    cycle_a: TileCycle<T>,
+    cycle_b: TileCycle<T>,
 }
 
-#[derive(Debug, Clone)]
-struct Tile {
-    pub size: usize,
-    cells: Vec<bool>,
+enum BoardTile {
+    A,
+    B,
+    Other(Tile),
 }
 
-impl Board {
-    fn new(a: &Tile, b: &Tile) -> Board {
-        assert!(a.size == b.size);
+impl <T> Board<T> where T: LifeTile {
+    fn new(a: &T, b: &T) -> Board<T> {
+        assert!(a.size() == b.size());
         let tiles = BTreeMap::new();
 
         Board {
-            tile_size: a.size,
+            tile_size: a.size(),
             cycle_a: TileCycle::new(a),
             cycle_b: TileCycle::new(b),
             tiles: tiles,
@@ -105,7 +202,7 @@ impl Board {
         let first = self.first_or(-1) - 1;
         let last = self.last_or(0) + 1;
 
-        for x in (first..last + 1) {
+        for x in first..last + 1 {
             let t = self.tile_at(x);
             let tnew = t.next_generation(self.tile_at(x - 1), self.tile_at(x + 1));
 
@@ -117,7 +214,7 @@ impl Board {
         self.tiles = tiles_new;
         self.generation += 1;
 
-        if self.generation % 200 == 0 {
+        if self.generation % 500 == 0 {
             println!("generation: {}", self.generation);
         }
     }
@@ -166,11 +263,11 @@ impl Board {
         }
     }
 
-    fn default_tile_at(&self, x: isize) -> &Tile {
+    fn default_tile_at(&self, x: isize) -> &T {
         self.default_tile_at_gen(x, self.generation)
     }
 
-    fn default_tile_at_gen(&self, x: isize, generation: usize) -> &Tile {
+    fn default_tile_at_gen(&self, x: isize, generation: usize) -> &T {
         let cycle = if x < 0 {
             &self.cycle_a
         } else {
@@ -179,7 +276,7 @@ impl Board {
         return &cycle.default_at_gen(generation);
     }
 
-    fn tile_at(&self, x: isize) -> &Tile {
+    fn tile_at(&self, x: isize) -> &T {
         match self.tiles.get(&x) {
             Some(v) => v,
             None => self.default_tile_at(x),
@@ -187,11 +284,11 @@ impl Board {
     }
 }
 
-impl TileCycle {
+impl <T> TileCycle<T> where T: LifeTile{
     // tile, when in an infinate grid of itself, must repeate (or will assert)
     // evaluate that repeat cycle, and store it.
-    fn new(tile: &Tile) -> TileCycle {
-        let mut tc = TileCycle { tiles: vec![] };
+    fn new(tile: &T) -> TileCycle<T> {
+        let mut tc = TileCycle::<T> { tiles: vec![] };
         let mut t = tile.clone();
         loop {
             let t2 = t.next_generation(&t, &t);
@@ -213,17 +310,23 @@ impl TileCycle {
         return tc;
     }
 
-    fn default_at_gen(&self, generation: usize) -> &Tile {
+    fn default_at_gen(&self, generation: usize) -> &T {
         &self.tiles[generation % self.tiles.len()]
     }
 }
 
 #[derive(Debug)]
-struct TileCycle {
-    pub tiles: Vec<Tile>,
+struct TileCycle<T> where T: LifeTile {
+    pub tiles: Vec<T>,
 }
 
-impl Tile {
+#[derive(Debug, Clone)]
+struct Tile {
+    pub size: usize,
+    cells: Vec<bool>,
+}
+
+impl LifeTile for Tile{
     fn new(size: usize) -> Tile {
         Tile {
             size: size,
@@ -231,65 +334,8 @@ impl Tile {
         }
     }
 
-    fn mirror(&self) -> Tile {
-        let mut t = Tile {
-            size: self.size,
-            cells: vec![false; self.size * self.size],
-        };
-
-        for x in 0..self.size {
-            for y in 0..self.size {
-                t.set(x, y, self.get(self.size - x - 1, y));
-            }
-        }
-        return t;
-    }
-
-    fn next_generation(&self, previous: &Tile, next: &Tile) -> Tile {
-        let size = self.size;
-
-        let at = |x: isize, y: isize| {
-            let y2 = y.mod_floor(&(size as isize));
-            let x2 = x.mod_floor(&(size as isize));
-            let t = if x < 0 {
-                &previous
-            } else if x >= size as isize {
-                &next
-            } else {
-                &self
-            };
-
-            return t.get(x2 as usize, y2 as usize);
-        };
-
-        let mut t = Tile::new(size);
-
-        for x in 0..size {
-            for y in 0..size {
-                let mut c = 0;
-
-                for xx in -1isize..2 {
-                    for yy in -1isize..2 {
-                        if at(xx + x as isize, yy + y as isize) {
-                            c += 1;
-                        }
-                    }
-                }
-
-                let v = if self.get(x, y) {
-                    c == 3 || c == 4
-                } else {
-                    c == 3
-                };
-
-                t.set(x, y, v);
-            }
-        }
-        return t;
-    }
-
-    fn index(&self, x: usize, y: usize) -> usize {
-        x + y * self.size
+    fn size(&self) -> usize{
+        self.size
     }
 
     fn get(&self, x: usize, y: usize) -> bool {
@@ -300,19 +346,11 @@ impl Tile {
         let index = self.index(x, y);
         self.cells[index] = value;
     }
+}
 
-    fn print_line(&self, y: usize) {
-        for x in 0..self.size {
-            let s = if self.get(x, y) { "X" } else { "." };
-            print!("{}", s);
-        }
-    }
-
-    fn print(&self) {
-        for y in 0..self.size {
-            self.print_line(y);
-            println!();
-        }
+impl Tile {
+    fn index(&self, x: usize, y: usize) -> usize {
+        x + y * self.size
     }
 }
 
@@ -321,4 +359,48 @@ impl PartialEq for Tile {
         self.cells == other.cells
     }
 }
+
 impl Eq for Tile {}
+
+
+#[derive(Debug, Clone)]
+struct BitTile {
+    pub size: usize,
+    cells: FixedBitSet,
+}
+
+impl LifeTile for BitTile{
+    fn new(size: usize) -> BitTile {
+        BitTile {
+            size: size,
+            cells: FixedBitSet::with_capacity(size*size),
+        }
+    }
+
+    fn size(&self) -> usize{
+        self.size
+    }
+
+    fn get(&self, x: usize, y: usize) -> bool {
+        self.cells.contains(self.index(x, y))
+    }
+
+    fn set(&mut self, x: usize, y: usize, value: bool) {
+        let index = self.index(x, y);
+        self.cells.set(index, value);
+    }
+}
+
+impl BitTile {
+    fn index(&self, x: usize, y: usize) -> usize {
+        x + y * self.size
+    }
+}
+
+impl PartialEq for BitTile {
+    fn eq(&self, other: &BitTile) -> bool {
+        self.cells == other.cells
+    }
+}
+
+impl Eq for BitTile {}
