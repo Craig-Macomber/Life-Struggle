@@ -61,22 +61,23 @@ where
     }
 
     pub fn score(&self) -> (isize, isize) {
-        let mut score_a = 0;
-        let mut score_b = 0;
+        let first = self.lowest_non_a();
+        let last = self.highest_non_b();
 
-        for (x, tile) in self.tiles.iter() {
-            if x < &0 {
-                score_a -= 1;
-                if tile == self.cycle_b.default_at_gen(self.generation) {
-                    score_b += 1;
-                }
-            } else {
-                score_b -= 1;
-                if tile == self.cycle_a.default_at_gen(self.generation) {
-                    score_a += 1;
-                }
+        // init to contigious tiles captured (negative is tiles were lost)
+        let mut score_a = first; 
+        let mut score_b = -last-1;
+
+        // Go through contested area, and see if any tiles match a or b
+        for x in first..=last {
+            let t = self.tile_at(x);
+            if t == self.cycle_a.default_at_gen(self.generation) {
+                score_a += 1;
+            } else if t == self.cycle_b.default_at_gen(self.generation) {
+                score_b += 1;
             }
         }
+
         return (score_a, score_b);
     }
 
