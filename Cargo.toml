@@ -8,3 +8,6 @@ num-integer = "0.1"
 rayon = "0.9"
 time = "*"
 fixedbitset = "0.1"
+
+[profile.release]
+lto = true
