@@ -72,26 +72,32 @@ fn struggle(tile_a: &LifeTileSrc, tile_b: &LifeTileSrc) {
     let bit_tile_a = T::copy_from(tile_a);
     let bit_tile_b = T::copy_from(tile_b).mirror();
 
-    if bit_tile_a == bit_tile_b {
-        // Can not distinguish the two players, they are identical after mirroring
-        println!("Mirror Draw!");
-        return;
-    }
-
-    let mut b = Board::new(&bit_tile_a, &bit_tile_b);
-    println!("Cycle lengths: {}, {}", b.cycle_a.len(), b.cycle_b.len());
+    let mut b = Board::new(bit_tile_a, bit_tile_b);
     println!("Begin!");
 
-    //b.print();
-
-    for _ in 0..100 {
-        b.next_generation();
-        if b.generation % 50 == 0 {
-            println!("generation: {}", b.generation);
+    for g in 0..100 {
+        match b {
+            Some(x) => {
+                b = x.next_generation();
+            }
+            None => {
+                println!("convergance draw at generation: {}", g);
+                return;
+            }
+        }
+        if g % 50 == 0 {
+            println!("generation: {}", g);
         }
     }
 
-    //b.print();
-    let (score_a, score_b) = b.score();
-    println!("Score: {} to {}!", score_a, score_b);
+    match b {
+        Some(x) => {
+            let (score_a, score_b) = x.score();
+            println!("Score: {} to {}!", score_a, score_b);
+        }
+        None => {
+            println!("convergance draw at end!");
+            return;
+        }
+    }
 }
