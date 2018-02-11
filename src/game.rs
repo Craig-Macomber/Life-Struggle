@@ -16,7 +16,6 @@ pub fn struggle(generations: usize, tile_a: &LifeTileSrc, tile_b: &LifeTileSrc) 
     type T = VecTile;
     type B = VecBoard<T>;
 
-
     let bit_tile_a = T::copy_from(tile_a);
     let bit_tile_b = T::copy_from(tile_b).mirror();
 
@@ -33,13 +32,14 @@ pub fn struggle(generations: usize, tile_a: &LifeTileSrc, tile_b: &LifeTileSrc) 
                 break;
             }
         }
-        if g % 50 == 0 {
+        if g % 200 == 0 {
             println!("generation: {}", g);
         }
     }
 
     match b {
         Some(x) => {
+            x.print_image();
             return x.score();
         }
         None => {
@@ -134,7 +134,7 @@ mod tests {
             assert_eq!(score_a, 6);
             assert_eq!(score_b, -6);
         }
-        
+
         {
             let (score_b, score_a) = struggle(100, &b, &a);
             assert_eq!(score_a, 6);

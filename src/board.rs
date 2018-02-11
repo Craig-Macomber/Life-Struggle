@@ -1,8 +1,10 @@
-extern crate rayon;
-use std::collections::BTreeMap;
 use tile::*;
-use std::marker::{Sized, Sync, Send};
-//use rayon::prelude::*;
+use std::marker::Sized;
+use rayon::prelude::*;
+use rayon;
+use image::ImageBuffer;
+use image;
+use std::fs::File;
 
 pub trait Board<T>: Sized
 where
@@ -15,7 +17,7 @@ where
             return None;
         }
 
-        Some(Self::new_inner(a,b))
+        Some(Self::new_inner(a, b))
     }
 
     fn new_inner(a: T, b: T) -> Self;
@@ -66,6 +68,34 @@ where
         }
     }
 
+    fn print_image(&self) {
+        let first = self.lowest_non_a() - 1;
+        let last = self.highest_non_b() + 1;
+        let range = first..=last;
+        let tile_size = self.tile_size();
+        let mut img = ImageBuffer::new((tile_size * range.count()) as u32, tile_size as u32);
+
+        //for x in range {
+        //    img.put_pixel(x * tile_size, tile_size, image::Luma([255 as u8]))
+        //    img.put_pixel((x +1) * tile_size - 1, tile_size, image::Luma([255 as u8]))
+        //}
+        
+        for x in first..=last {
+            let t = self.tile_at(x);
+            for yy in 0usize..self.tile_size() {
+                for xx in 0usize..self.tile_size() {
+                    let b = t.get(xx,yy);
+                    let luma : u8 = if b {0} else {255};
+                    img.put_pixel(((x - first) as usize * tile_size + xx) as u32, yy as u32, image::Luma([luma]))
+                }
+            }
+        }
+        
+
+        let ref mut fout = File::create("life.png").unwrap();
+        image::ImageLuma8(img).save(fout, image::PNG).unwrap();
+    }
+
     fn tile_at(&self, x: isize) -> &T;
 }
 
@@ -97,65 +127,72 @@ where
         let first = self.lowest_non_a() - 1;
         let last = self.highest_non_b() + 1;
 
-        let a_next = self.a.next_generation(&self.a, &self.a);
-        let b_next = self.b.next_generation(&self.b, &self.b);
+        let (a_next, b_next): (T, T) = rayon::join(
+            || self.a.next_generation(&self.a, &self.a),
+            || self.b.next_generation(&self.b, &self.b),
+        );
+
         if a_next == b_next {
             return None;
         }
 
-        let mut tiles_new = Vec::with_capacity(((last-first) as usize)+1);
-
-        for x in first..=last {
-            let t = self.tile_at(x);
-            let tnew = t.next_generation(self.tile_at(x - 1), self.tile_at(x + 1));
-            tiles_new.push(tnew);
-        }
+        let mut tiles_new: Vec<T> = (first..last + 1)
+            .into_par_iter()
+            .map(|x| -> T {
+                self.tile_at(x)
+                    .next_generation(self.tile_at(x - 1), self.tile_at(x + 1))
+            })
+            .collect();
 
         let mut num_a_at_start_new = 0;
-        for i in 0..tiles_new.len(){
-            if tiles_new[i]==a_next{
-                num_a_at_start_new = i as isize;
-            }
-            else{
+        for i in 0..tiles_new.len() {
+            if tiles_new[i] == a_next {
+                num_a_at_start_new = i as isize + 1;
+            } else {
                 break;
             }
         }
 
-        while tiles_new.len() > 0 && tiles_new.last().unwrap() == &b_next{
+        while tiles_new.len() > 0 && tiles_new.last().unwrap() == &b_next {
             tiles_new.pop();
         }
 
-        return Some(VecBoard {
+        let b_new =VecBoard {
             a: a_next,
             b: b_next,
             tiles: tiles_new,
             num_a_at_start: num_a_at_start_new,
             vec_start: first,
-        });
+        };
+
+        debug_assert!(b_new.tile_at(b_new.lowest_non_a()) != &b_new.a);
+        debug_assert!(b_new.tile_at(b_new.highest_non_b()) != &b_new.b);
+
+        return Some(b_new);
     }
 
     fn new_inner(a: T, b: T) -> Self {
         VecBoard {
             a: a,
             b: b,
-            tiles: vec!(),
+            tiles: vec![],
             num_a_at_start: 0,
             vec_start: 0,
         }
     }
 
-    fn a_current(&self) -> &T{
+    fn a_current(&self) -> &T {
         &self.a
     }
 
-    fn b_current(&self) -> &T{
+    fn b_current(&self) -> &T {
         &self.b
     }
 
     fn tile_at(&self, x: isize) -> &T {
-        if x < self.lowest_non_a(){
+        if x < self.lowest_non_a() {
             &self.a
-        } else if x > self.highest_non_b(){
+        } else if x > self.highest_non_b() {
             &self.b
         } else {
             &self.tiles[(x - self.vec_start) as usize]
