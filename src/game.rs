@@ -1,5 +1,5 @@
 use tile::*;
-use board::Board;
+use board::*;
 
 // Life Struggle:
 // 1 vs 1 competitive version of Conway's Game of Life
@@ -14,11 +14,13 @@ use board::Board;
 pub fn struggle(generations: usize, tile_a: &LifeTileSrc, tile_b: &LifeTileSrc) -> (isize, isize) {
     // Tile format to use for simulation
     type T = VecTile;
+    type B = VecBoard<T>;
+
 
     let bit_tile_a = T::copy_from(tile_a);
     let bit_tile_b = T::copy_from(tile_b).mirror();
 
-    let mut b = Board::new(bit_tile_a, bit_tile_b);
+    let mut b = B::new(bit_tile_a, bit_tile_b);
     println!("Begin!");
 
     for g in 0..generations {
@@ -47,15 +49,13 @@ pub fn struggle(generations: usize, tile_a: &LifeTileSrc, tile_b: &LifeTileSrc) 
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_lwss_vs_gliders() {
-        let size = 400;
+        let size = 40;
 
         let mut a = VecTile::new(size);
         {
@@ -95,9 +95,15 @@ mod tests {
         // send gliders +x+y
         b = b.mirror();
 
-        let (score_a, score_b) = struggle(1, &a, &b);
-        assert_eq!(score_a, 0);
-        assert_eq!(score_b, 0);
+        let (score_a, score_b) = struggle(500, &a, &b);
+        println!("Score: {} to {}", score_a, score_b);
+        assert_eq!(score_a, -2);
+        assert_eq!(score_b, -1);
+
+        let (score_a, score_b) = struggle(2000, &a, &b);
+        println!("Score: {} to {}", score_a, score_b);
+        assert_eq!(score_a, -3);
+        assert_eq!(score_b, -1);
     }
 
     #[test]
@@ -140,7 +146,6 @@ mod tests {
             assert_eq!(score_a, 0);
             assert_eq!(score_b, 0);
         }
-
 
         {
             let (score_b, score_a) = struggle(100, &b, &b);

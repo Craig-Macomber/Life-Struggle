@@ -8,8 +8,7 @@ use tile::*;
 
 fn main() {
     println!("Life Struggle");
-
-    let size = 8;
+    let size = 40;
 
         let mut a = VecTile::new(size);
         {
@@ -28,10 +27,28 @@ fn main() {
             q(3, 0);
         }
 
-        let b = VecTile::new(size);
+        let mut b = VecTile::new(size);
+        {
+            let mut q = |x: usize, y: usize| b.set(x, y, false);
 
+            // Two gliders going -x+y
+            q(9, 0);
+            q(8, 1);
+            q(10, 2);
+            q(9, 2);
+            q(8, 2);
+
+            q(9, 10);
+            q(8, 11);
+            q(10, 12);
+            q(9, 12);
+            q(8, 12);
+        }
+
+        // send gliders +x+y
+        //b = b.mirror();
     let start = PreciseTime::now();
-    let (score_a, score_b) = game::struggle(100, &a, &b);
+    let (score_a, score_b) = game::struggle(1000, &a, &b);
     println!(
         "Time in MS: {}",
         start.to(PreciseTime::now()).num_milliseconds()
