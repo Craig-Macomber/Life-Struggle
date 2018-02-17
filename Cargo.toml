@@ -9,6 +9,7 @@ rayon = "0.9"
 time = "*"
 fixedbitset = "0.1"
 image = "*"
+rand = "0.4"
 
 [profile.release]
 # lto = true

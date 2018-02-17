@@ -41,6 +41,18 @@ where
         return t;
     }
 
+    fn mirror_over_x(&self) -> Self {
+        let size = self.size();
+        let mut t = Self::new(size);
+
+        for x in 0..size {
+            for y in 0..size {
+                t.set(x, y, self.get(x, size - y - 1));
+            }
+        }
+        return t;
+    }
+
     // LifeTile is for use in a world where each row (along Y) of tiles is the same,
     // so we just need 3 tiles (instead of 9) to have a complete Moore neighborhood
     // for each cell in self.

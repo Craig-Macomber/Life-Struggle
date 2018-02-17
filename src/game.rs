@@ -1,5 +1,10 @@
 use tile::*;
 use board::*;
+use std::fs::File;
+
+// Tile format to use for simulation
+type T = VecTile;
+type B = VecBoard<T>;
 
 // Life Struggle:
 // 1 vs 1 competitive version of Conway's Game of Life
@@ -12,15 +17,25 @@ use board::*;
 // 1 point deducted for each tile of your territory disrupted.
 // Returns (score_a, score_b).
 pub fn struggle(generations: usize, tile_a: &LifeTileSrc, tile_b: &LifeTileSrc) -> (isize, isize) {
-    // Tile format to use for simulation
-    type T = VecTile;
-    type B = VecBoard<T>;
+    let b = struggle_board(generations, tile_a, tile_b);
 
+    match b {
+        Some(x) => {
+            let ref mut fout = File::create("life.png").unwrap();
+            x.print_image(fout);
+            return x.score();
+        }
+        None => {
+            println!("convergance draw");
+            return (0, 0);
+        }
+    }
+}
+
+pub fn struggle_board(generations: usize, tile_a: &LifeTileSrc, tile_b: &LifeTileSrc) -> Option<B> {
     let bit_tile_a = T::copy_from(tile_a);
     let bit_tile_b = T::copy_from(tile_b).mirror();
-
     let mut b = B::new(bit_tile_a, bit_tile_b);
-    println!("Begin!");
 
     for g in 0..generations {
         match b {
@@ -33,20 +48,11 @@ pub fn struggle(generations: usize, tile_a: &LifeTileSrc, tile_b: &LifeTileSrc) 
             }
         }
         if g % 200 == 0 {
-            println!("generation: {}", g);
+            //println!("generation: {}", g);
         }
     }
 
-    match b {
-        Some(x) => {
-            x.print_image();
-            return x.score();
-        }
-        None => {
-            println!("convergance draw");
-            return (0, 0);
-        }
-    }
+    return b;
 }
 
 #[cfg(test)]

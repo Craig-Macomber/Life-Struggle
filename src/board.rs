@@ -68,7 +68,7 @@ where
         }
     }
 
-    fn print_image(&self) {
+    fn print_image(&self, fout: &mut File) {
         let first = self.lowest_non_a() - 1;
         let last = self.highest_non_b() + 1;
         let range = first..=last;
@@ -79,20 +79,22 @@ where
         //    img.put_pixel(x * tile_size, tile_size, image::Luma([255 as u8]))
         //    img.put_pixel((x +1) * tile_size - 1, tile_size, image::Luma([255 as u8]))
         //}
-        
+
         for x in first..=last {
             let t = self.tile_at(x);
             for yy in 0usize..self.tile_size() {
                 for xx in 0usize..self.tile_size() {
-                    let b = t.get(xx,yy);
-                    let luma : u8 = if b {0} else {255};
-                    img.put_pixel(((x - first) as usize * tile_size + xx) as u32, yy as u32, image::Luma([luma]))
+                    let b = t.get(xx, yy);
+                    let luma: u8 = if b { 0 } else { 255 };
+                    img.put_pixel(
+                        ((x - first) as usize * tile_size + xx) as u32,
+                        yy as u32,
+                        image::Luma([luma]),
+                    )
                 }
             }
         }
-        
 
-        let ref mut fout = File::create("life.png").unwrap();
         image::ImageLuma8(img).save(fout, image::PNG).unwrap();
     }
 
@@ -157,7 +159,7 @@ where
             tiles_new.pop();
         }
 
-        let b_new =VecBoard {
+        let b_new = VecBoard {
             a: a_next,
             b: b_next,
             tiles: tiles_new,
