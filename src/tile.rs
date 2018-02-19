@@ -59,6 +59,69 @@ where
     fn next_generation(&self, previous: &Self, next: &Self) -> Self {
         let size = self.size();
 
+        // Write next generation into new tile
+        let mut t = Self::new(size);
+
+        // Do edges with general logic
+        for y in [0, size - 1].iter() {
+            for x in 0..size {
+                t.set(x, *y, self.next_generation_cell(previous, next, x, *y));
+            }
+        }
+
+        for x in [0, size - 1].iter() {
+            for y in 1..(size - 1) {
+                t.set(*x, y, self.next_generation_cell(previous, next, *x, y));
+            }
+        }
+
+        // Do center woth optimized logic
+        for y in 1..(size - 1) {
+            for x in 1..(size - 1) {
+                // Count live cells in Moore neighborhood of (x,y)
+                // Hand unrolling this has been tested to be a perf win.
+                let mut c1 = 0;
+                let mut c2 = 0;
+                let mut c3 = 0;
+                let mut at = |cc: &mut usize, ix: usize, iy: usize| {
+                    if self.get(ix, iy) {
+                        *cc += 1;
+                    };
+                };
+                at(&mut c1, x - 1, y - 1);
+                at(&mut c2, x + 0, y - 1);
+                at(&mut c3, x + 1, y - 1);
+                at(&mut c1, x - 1, y + 0);
+                at(&mut c2, x + 0, y + 0);
+                at(&mut c3, x + 1, y + 0);
+                at(&mut c1, x - 1, y + 1);
+                at(&mut c2, x + 0, y + 1);
+                at(&mut c3, x + 1, y + 1);
+
+                let c = c1 + c2 + c3;
+
+                // Apply Conway's Game of Life life and death rules
+                let v = if self.get(x, y) {
+                    c == 3 || c == 4
+                } else {
+                    c == 3
+                };
+
+                if v {
+                    t.set(x, y, v);
+                }
+            }
+        }
+
+        return t;
+    }
+
+    // LifeTile is for use in a world where each row (along Y) of tiles is the same,
+    // so we just need 3 tiles (instead of 9) to have a complete Moore neighborhood
+    // for each cell in self.
+    fn next_generation_cell(&self, previous: &Self, next: &Self, x: usize, y: usize) -> bool {
+        let size = self.size();
+
         let at = |x: isize, y: isize| {
             let y2 = y.mod_floor(&(size as isize));
             let x2 = x.mod_floor(&(size as isize));
@@ -73,32 +136,22 @@ where
             return t.get(x2 as usize, y2 as usize);
         };
 
-        // Write next generation into new tile
-        let mut t = Self::new(size);
-
-        for y in 0..size {
-            for x in 0..size {
-                // Count live cells in Moore neighborhood of (x,y)
-                let mut c = 0;
-                for yy in -1isize..=1 {
-                    for xx in -1isize..=1 {
-                        if at(xx + x as isize, yy + y as isize) {
-                            c += 1;
-                        }
-                    }
+        // Count live cells in Moore neighborhood of (x,y)
+        let mut c = 0;
+        for yy in -1isize..=1 {
+            for xx in -1isize..=1 {
+                if at(xx + x as isize, yy + y as isize) {
+                    c += 1;
                 }
-
-                // Apply Conway's Game of Life life and death rules
-                let v = if self.get(x, y) {
-                    c == 3 || c == 4
-                } else {
-                    c == 3
-                };
-
-                t.set(x, y, v);
             }
         }
-        return t;
+
+        // Apply Conway's Game of Life life and death rules
+        if self.get(x, y) {
+            c == 3 || c == 4
+        } else {
+            c == 3
+        }
     }
 
     fn print_line(&self, y: usize) {

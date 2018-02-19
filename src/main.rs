@@ -1,10 +1,12 @@
 #![feature(inclusive_range_syntax)]
+#![feature(test)]
 mod tile;
 mod board;
 mod game;
 extern crate image;
 extern crate rand;
 extern crate rayon;
+extern crate test;
 extern crate time;
 use time::PreciseTime;
 use tile::*;

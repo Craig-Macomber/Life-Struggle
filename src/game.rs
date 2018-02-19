@@ -56,6 +56,8 @@ pub fn struggle_board(generations: usize, tile_a: &LifeTileSrc, tile_b: &LifeTil
 }
 
 #[cfg(test)]
+use test::Bencher;
+
 mod tests {
     use super::*;
 
@@ -64,21 +66,7 @@ mod tests {
         let size = 40;
 
         let mut a = VecTile::new(size);
-        {
-            let mut q = |x: usize, y: usize| a.set(x, y, true);
-
-            // Light weight space ship going +x
-            q(0, 0);
-            q(0, 2);
-            q(1, 3);
-            q(2, 3);
-            q(3, 3);
-            q(4, 3);
-            q(4, 2);
-            q(4, 2);
-            q(4, 1);
-            q(3, 0);
-        }
+        lwss_at(&mut a, 0, 0);
 
         let mut b = VecTile::new(size);
         {
@@ -112,26 +100,28 @@ mod tests {
         assert_eq!(score_b, -1);
     }
 
+    fn lwss_at<T: LifeTile>(t: &mut T, x: usize, y: usize) {
+        let mut q = |xx: usize, yy: usize| t.set(x + xx, y + yy, true);
+
+        // Light weight space ship going +x
+        q(0, 0);
+        q(0, 2);
+        q(1, 3);
+        q(2, 3);
+        q(3, 3);
+        q(4, 3);
+        q(4, 2);
+        q(4, 2);
+        q(4, 1);
+        q(3, 0);
+    }
+
     #[test]
     fn test_lwss_vs_empty() {
         let size = 8;
 
         let mut a = VecTile::new(size);
-        {
-            let mut q = |x: usize, y: usize| a.set(x, y, true);
-
-            // Light weight space ship going +x
-            q(0, 0);
-            q(0, 2);
-            q(1, 3);
-            q(2, 3);
-            q(3, 3);
-            q(4, 3);
-            q(4, 2);
-            q(4, 2);
-            q(4, 1);
-            q(3, 0);
-        }
+        lwss_at(&mut a, 0, 0);
 
         let b = VecTile::new(size);
 
@@ -158,5 +148,37 @@ mod tests {
             assert_eq!(score_a, 0);
             assert_eq!(score_b, 0);
         }
+    }
+
+    #[bench]
+    fn bench_lwss_200(b: &mut Bencher) {
+        let size = 200;
+
+        let mut a = VecTile::new(size);
+        for x in 0..(size / 10) {
+            for y in 0..(size / 10) {
+                lwss_at(&mut a, x * 10, y * 10);
+            }
+        }
+
+        b.iter(|| {
+            a = a.next_generation(&a, &a);
+        });
+    }
+
+    #[bench]
+    fn bench_lwss_2000(b: &mut Bencher) {
+        let size = 2000;
+
+        let mut a = VecTile::new(size);
+        for x in 0..(size / 10) {
+            for y in 0..(size / 10) {
+                lwss_at(&mut a, x * 10, y * 10);
+            }
+        }
+
+        b.iter(|| {
+            a = a.next_generation(&a, &a);
+        });
     }
 }
