@@ -4,12 +4,12 @@ version = "0.1.0"
 authors = ["Craig Macomber <CraigM@CraigM.info>"]
 
 [dependencies]
-num-integer = "0.1"
-rayon = "0.9"
-time = "*"
-fixedbitset = "0.1"
-image = "*"
-rand = "0.4"
+num-integer = "0.1.39"
+rayon = "1.0.2"
+time = "0.1.40"
+fixedbitset = "0.1.9"
+image = "0.19.0"
+rand = "0.5.5"
 
 [profile.release]
 # lto = true

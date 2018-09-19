@@ -1,10 +1,9 @@
-use tile::*;
-use std::marker::Sized;
-use rayon::prelude::*;
-use rayon;
-use image::ImageBuffer;
 use image;
-use std::fs::File;
+use rayon;
+use rayon::prelude::*;
+use std::marker::Sized;
+use std::path::Path;
+use tile::*;
 
 pub trait Board<T>: Sized
 where
@@ -68,12 +67,16 @@ where
         }
     }
 
-    fn print_image(&self, fout: &mut File) {
+    fn print_image<Q>(&self, path: Q)
+    where
+        Q: AsRef<Path>,
+    {
         let first = self.lowest_non_a() - 1;
         let last = self.highest_non_b() + 1;
         let range = first..=last;
         let tile_size = self.tile_size();
-        let mut img = ImageBuffer::new((tile_size * range.count()) as u32, tile_size as u32);
+        let mut imgbuf =
+            image::GrayImage::new((tile_size * range.count()) as u32, tile_size as u32);
 
         //for x in range {
         //    img.put_pixel(x * tile_size, tile_size, image::Luma([255 as u8]))
@@ -86,7 +89,7 @@ where
                 for xx in 0usize..self.tile_size() {
                     let b = t.get(xx, yy);
                     let luma: u8 = if b { 0 } else { 255 };
-                    img.put_pixel(
+                    imgbuf.put_pixel(
                         ((x - first) as usize * tile_size + xx) as u32,
                         yy as u32,
                         image::Luma([luma]),
@@ -95,7 +98,7 @@ where
             }
         }
 
-        image::ImageLuma8(img).save(fout, image::PNG).unwrap();
+        imgbuf.save(path).unwrap();
     }
 
     fn tile_at(&self, x: isize) -> &T;
@@ -143,8 +146,7 @@ where
             .map(|x| -> T {
                 self.tile_at(x)
                     .next_generation(self.tile_at(x - 1), self.tile_at(x + 1))
-            })
-            .collect();
+            }).collect();
 
         let mut num_a_at_start_new = 0;
         for i in 0..tiles_new.len() {

@@ -1,19 +1,16 @@
-#![feature(inclusive_range_syntax)]
 #![feature(test)]
-mod tile;
 mod board;
 mod game;
+mod tile;
 extern crate image;
 extern crate rand;
 extern crate rayon;
 extern crate test;
 extern crate time;
-use time::PreciseTime;
-use tile::*;
-use rand::Rng;
-use std::fs::File;
 use board::Board;
+use rand::Rng;
 use std::cmp::Ordering;
+use tile::*;
 
 type T = VecTile;
 
@@ -113,10 +110,10 @@ pub fn struggle_random() {
                 match board {
                     Some(x) => {
                         let (a_s, b_s) = x.score();
-                        let ref mut fout = File::create(format!(
+                        let ref mut fout = format!(
                             "./images/{:03}-{:02}: {} to {}.png",
                             pa.name, pb.name, a_s, b_s
-                        )).unwrap();
+                        );
                         x.print_image(fout);
                         if a_s > b_s {
                             pa.wins += 1;

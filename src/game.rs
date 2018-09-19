@@ -1,6 +1,5 @@
-use tile::*;
 use board::*;
-use std::fs::File;
+use tile::*;
 
 // Tile format to use for simulation
 type T = VecTile;
@@ -21,8 +20,7 @@ pub fn struggle(generations: usize, tile_a: &LifeTileSrc, tile_b: &LifeTileSrc) 
 
     match b {
         Some(x) => {
-            let ref mut fout = File::create("life.png").unwrap();
-            x.print_image(fout);
+            x.print_image("life.png");
             return x.score();
         }
         None => {
